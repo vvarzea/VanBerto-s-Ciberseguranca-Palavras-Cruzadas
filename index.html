@@ -399,53 +399,87 @@ body{font-family:'Nunito','Baloo 2',sans-serif;background:#241143;min-height:100
 
 /* ════════════════════════════════════════════════════════════════════
    PC RESPONSIVE SCALE SYSTEM — reference 1920×1080
-   Mobile (≤700px): wrapper is transparent, layout flows normally.
-   Desktop (>700px): wrapper becomes a fixed 1920×1080 stage that is
-   uniformly scaled with transform: scale(min(iw/1920, ih/1080)).
-   Game logic is untouched — only visual scaling.
+   This stage is now gated by the JS-controlled "desktop-stage" class on
+   <html> instead of a plain width media query. A real smartphone turned
+   sideways is often wider than 700px, so a width-only check used to
+   misclassify it as "desktop" and squeeze the whole game into a tiny
+   letterboxed rectangle. JS (see the applyScale script below) decides
+   "desktop-stage" using touch/screen-size detection, so phones — in any
+   orientation — stay in the normal, full-screen responsive layout, and
+   only real desktops/large screens get the fixed 1920×1080 scaled stage.
    ════════════════════════════════════════════════════════════════════ */
 #scale-wrap{width:100%;}
 
-@media(min-width:701px){
-  html,body{
-    width:100vw;height:100vh;height:100dvh;
-    overflow:hidden;
-    margin:0;
-  }
-  body{
-    /* Letterbox background fills any leftover space around scaled stage */
-    background:#0a0414;
-  }
-  #scale-wrap{
-    position:absolute;
-    top:0;left:0;
-    width:1920px;
-    height:1080px;
-    transform-origin:top left;
-    transform:scale(1);
-    will-change:transform;
-  }
-  /* Inside scaled stage, screens must fill the 1080px height,
-     NOT the actual viewport (which can be smaller). */
-  #scale-wrap .screen{
-    min-height:1080px!important;
-    max-height:1080px;
-    height:1080px;
-  }
-  #scale-wrap #gameScreen{
+html.desktop-stage,html.desktop-stage body{
+  width:100vw;height:100vh;height:100dvh;
+  overflow:hidden;
+  margin:0;
+}
+html.desktop-stage body{
+  /* Letterbox background fills any leftover space around scaled stage */
+  background:#0a0414;
+}
+html.desktop-stage #scale-wrap{
+  position:absolute;
+  top:0;left:0;
+  width:1920px;
+  height:1080px;
+  transform-origin:top left;
+  transform:scale(1);
+  will-change:transform;
+}
+/* Inside scaled stage, screens must fill the 1080px height,
+   NOT the actual viewport (which can be smaller). */
+html.desktop-stage #scale-wrap .screen{
+  min-height:1080px!important;
+  max-height:1080px;
+  height:1080px;
+}
+html.desktop-stage #scale-wrap #gameScreen{
+  overflow-y:auto;
+}
+/* Win overlay & confetti must cover only the stage, not the raw viewport */
+html.desktop-stage #scale-wrap #winOverlay{
+  position:absolute;
+  inset:0;
+}
+html.desktop-stage #scale-wrap #confetti{
+  position:absolute;
+  inset:0;
+}
+/* Fixed robot & prof tag are positioned relative to the stage
+   (transform on ancestor establishes containing block for fixed). */
+
+/* ── PHONE IN LANDSCAPE: make sure the game truly fills the screen ──
+   Wins over the generic ">700px" sidebar tweaks further up because it
+   is declared later in the stylesheet (same specificity). */
+@media(max-height:520px) and (orientation:landscape){
+  html:not(.desktop-stage) #gameScreen{
+    padding-top:.2rem;padding-bottom:.2rem;
+    height:100vh;height:100dvh;
     overflow-y:auto;
   }
-  /* Win overlay & confetti must cover only the stage, not the raw viewport */
-  #scale-wrap #winOverlay{
-    position:absolute;
-    inset:0;
+  html:not(.desktop-stage) .game-layout{
+    flex-direction:row;
+    align-items:stretch;
+    max-width:100%;
+    height:auto;
   }
-  #scale-wrap #confetti{
-    position:absolute;
-    inset:0;
+  html:not(.desktop-stage) #cw-wrap{
+    flex:1 1 auto;
+    align-items:flex-start;
   }
-  /* Fixed robot & prof tag are positioned relative to the stage
-     (transform on ancestor establishes containing block for fixed). */
+  html:not(.desktop-stage) .sidebar{
+    width:clamp(150px,26vw,210px);
+    max-width:210px;
+    flex:0 0 auto;
+    flex-direction:column;
+    position:static;
+    max-height:100%;
+    overflow-y:auto;
+  }
+  html:not(.desktop-stage) .clues-panel{flex-direction:column;}
+  html:not(.desktop-stage) .clues-section{max-height:none;}
 }
 </style>
 </head>
@@ -549,15 +583,36 @@ body{font-family:'Nunito','Baloo 2',sans-serif;background:#241143;min-height:100
   const MOBILE_BP = 700;
   const REF_W = 1920;
   const REF_H = 1080;
+  // Longest physical screen side (doesn't change when the phone rotates,
+  // since screen.width/height swap together) above which we assume a
+  // "real" tablet/desktop rather than a phone.
+  const PHONE_MAX_LONG_SIDE = 960;
+
+  function isPhoneDevice(){
+    const touch = ('ontouchstart' in window) || (navigator.maxTouchPoints||0) > 0;
+    if(!touch) return false;
+    const longSide = Math.max(window.screen.width||0, window.screen.height||0);
+    return longSide > 0 && longSide <= PHONE_MAX_LONG_SIDE;
+  }
+
+  // Desktop stage only for non-phone devices with a wide-enough viewport.
+  // A phone turned sideways can easily be wider than 700px, but it must
+  // still get the normal full-screen mobile layout, not the tiny scaled
+  // 1920×1080 stage meant for real desktop/laptop screens.
+  function shouldUseDesktopStage(){
+    return !isPhoneDevice() && window.innerWidth > MOBILE_BP;
+  }
 
   function applyScale(){
     const wrap = document.getElementById('scale-wrap');
     if(!wrap) return;
     const iw = window.innerWidth;
     const ih = window.innerHeight;
+    const desktop = shouldUseDesktopStage();
+    document.documentElement.classList.toggle('desktop-stage', desktop);
 
-    // Mobile: leave behaviour untouched, clear any inline scale.
-    if(iw <= MOBILE_BP){
+    // Mobile/phone: leave behaviour untouched, clear any inline scale.
+    if(!desktop){
       wrap.style.transform = '';
       wrap.style.transformOrigin = '';
       document.documentElement.style.setProperty('--game-scale', 1);
@@ -588,7 +643,16 @@ body{font-family:'Nunito','Baloo 2',sans-serif;background:#241143;min-height:100
   applyScale();
   window.addEventListener('load', applyScale);
   document.addEventListener('DOMContentLoaded', applyScale);
+
+  window.isPhoneDevice = isPhoneDevice;
 })();
+
+/* Shared helper: are we in the normal full-screen "mobile" flow
+   (phones in any orientation, and narrow desktop browser windows),
+   as opposed to the scaled 1920×1080 desktop stage? */
+function isMobileFlow(){
+  return !document.documentElement.classList.contains('desktop-stage');
+}
 
 /* ══ SONS ══ */
 let audioCtx=null;
@@ -626,12 +690,12 @@ function playWin(){
 
 /* ══ DICAS EDUCATIVAS DE CIBERSEGURANÇA ══ */
 const TIPS = {
-  'SENHA':'🔐 Uma senha forte tem letras, números e símbolos — e nunca a partilhes com ninguém!',
+  'SITE':'🔒 Antes de confiares num site, verifica se o endereço começa com "https://" e tem um cadeado.',
   'ROBÔ':'🤖 Os robôs (chatbots) podem ajudar-te, mas nunca lhes dês informações pessoais.',
   'SEGURANÇA':'🛡️ A cibersegurança protege-te de perigos online, tal como um cinto de segurança no carro.',
   'INTERNET':'🌍 A Internet é fantástica para aprender, mas usa-a sempre com responsabilidade e bom senso.',
   'BACKUP':'💾 Fazer backup é guardar uma cópia dos teus ficheiros, para nunca os perderes!',
-  'HACKER':'🕵️ Um hacker mal-intencionado tenta roubar dados — por isso usa sempre senhas fortes.',
+  'HACKER':'🕵️ Um hacker mal-intencionado tenta roubar dados — por isso usa sempre palavras-passe fortes.',
   'PRIVACIDADE':'🙈 A privacidade é decidir quem pode ver as tuas informações — protege sempre a tua!',
   'ANTIVÍRUS':'💉 Um antivírus protege o computador de programas maliciosos, como um médico digital.',
   'ATUALIZAR':'🔄 Atualizar os teus dispositivos corrige falhas de segurança — faz sempre as atualizações!',
@@ -661,7 +725,7 @@ function showTip(word) {
    ══════════════════════════════════════ */
 const WORDS = [
   { n:1,  w:'SEGURANÇA',   r:0,  c:0,  d:'across', clue:'Nome do tema deste jogo: cuidarmo-nos no mundo digital 🛡️' },
-  { n:1,  w:'SENHA',       r:0,  c:0,  d:'down',   clue:'Palavra secreta que usas para entrar numa conta 🔐' },
+  { n:1,  w:'SITE',        r:0,  c:0,  d:'down',   clue:'Página da Internet que visitas no browser, ex: www.exemplo.pt 🌐' },
   { n:2,  w:'ROBÔ',        r:0,  c:4,  d:'down',   clue:'O VanBerto\'s é um... que te ajuda a aprender! 🤖' },
   { n:3,  w:'ATUALIZAR',   r:0,  c:8,  d:'down',   clue:'Fazer isto aos programas e apps mantém-te mais protegido 🔄' },
   { n:4,  w:'INTERNET',    r:1,  c:11, d:'down',   clue:'Rede mundial onde navegamos e comunicamos 🌐' },
@@ -694,7 +758,7 @@ function buildLetterMap() {
 }
 
 /* ══ STATE ══ */
-let playerName = 'Herói das Crianças';
+let playerName = 'Herói da Cibersegurança';
 let letterMap = {};
 let userMap = {};    // "r,c" -> letter typed
 let solved = new Set(); // word keys "n-d"
@@ -726,7 +790,7 @@ function _renderGrid() {
   el.setAttribute('role','grid');
   el.setAttribute('aria-label','Grelha de palavras cruzadas. Usa Tab para navegar entre as casas e as setas do teclado para te mover dentro de uma palavra.');
 
-  const isMobile = window.innerWidth <= 700;
+  const isMobile = isMobileFlow();
   const wrap = document.getElementById('cw-wrap');
   // Use offsetWidth (unaffected by ancestor CSS transform) so the
   // PC scale wrapper does not distort cell-size calculations.
@@ -743,6 +807,15 @@ function _renderGrid() {
     }
   }
   avail = Math.min(avail, 820);
+  // On phones (any orientation) also cap by the available viewport height,
+  // so the grid always fits on screen instead of forcing a scroll — this
+  // matters most in landscape, where height is the tight dimension.
+  if (isMobile) {
+    const top = wrap.getBoundingClientRect().top;
+    const bottomBreathing = 10;
+    const availH = window.innerHeight - top - bottomBreathing;
+    if (availH > 60) avail = Math.min(avail, availH);
+  }
 
   const gap = isMobile ? 1 : 2;
   const pad = isMobile ? 6 : 10;
@@ -1184,7 +1257,7 @@ function setLetterbox(c){document.body.style.background=c;document.documentEleme
 
 /* ══ NAV ══ */
 document.getElementById('btnStart').addEventListener('click', () => {
-  playerName = document.getElementById('playerName').value.trim() || 'Herói das Crianças';
+  playerName = document.getElementById('playerName').value.trim() || 'Herói da Cibersegurança';
   document.getElementById('startScreen').classList.remove('active');
   document.getElementById('gameScreen').classList.add('active');
   setLetterbox('#241143');
@@ -1207,17 +1280,24 @@ function goMenu() {
   showBub('Descobre as palavras da Cibersegurança! ✏️🛡️');
   stopConf();
 }
-let resT, lastInnerW = window.innerWidth;
+let resT, lastInnerW = window.innerWidth, lastInnerH = window.innerHeight;
+function rebuildGridIfActiveAndChanged(){
+  if(document.getElementById('gameScreen').classList.contains('active')) {
+    if (window.innerWidth !== lastInnerW || window.innerHeight !== lastInnerH) {
+      lastInnerW = window.innerWidth;
+      lastInnerH = window.innerHeight;
+      rebuildGridKeepState();
+    }
+  }
+}
 window.addEventListener('resize',()=>{
   clearTimeout(resT);
-  resT = setTimeout(()=>{
-    if(document.getElementById('gameScreen').classList.contains('active')) {
-      if (window.innerWidth !== lastInnerW) {
-        lastInnerW = window.innerWidth;
-        rebuildGridKeepState();
-      }
-    }
-  }, 200);
+  resT = setTimeout(rebuildGridIfActiveAndChanged, 200);
+});
+/* orientationchange sometimes fires before the browser updates
+   innerWidth/innerHeight, so re-check a little later too */
+window.addEventListener('orientationchange',()=>{
+  setTimeout(rebuildGridIfActiveAndChanged, 350);
 });
 
 function rebuildGridKeepState() {
