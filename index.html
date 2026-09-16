@@ -4,7 +4,7 @@
 
 <meta http-equiv="Content-Language" content="pt-PT">
 <meta name="language" content="pt-PT">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>VanBerto's — Palavras Cruzadas · Cibersegurança</title>
 <link href="./index_files/css2" rel="stylesheet">
 <style>
@@ -59,6 +59,7 @@ body{font-family:'Nunito','Baloo 2',sans-serif;background:#241143;min-height:100
 .btn.primary:hover{background:linear-gradient(180deg,#ff8050,#e85020)}
 .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:10px}
 .tiny{margin-top:8px;font-size:11px;color:#ffb890;opacity:.8;font-style:italic;text-align:center}
+html:not(.desktop-stage) #recordDisplay{display:none;}
 .modal-sub{color:#ffb8a0;font-size:clamp(.78rem,2vw,.88rem);text-align:center;font-weight:700;line-height:1.4;}
 
 /* ══ GAME SCREEN ══ */
@@ -77,6 +78,27 @@ body{font-family:'Nunito','Baloo 2',sans-serif;background:#241143;min-height:100
 }
 .header-actions{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
 .btn-sm{padding:4px 10px!important;font-size:.72rem!important;}
+.timer-box{
+  font-family:'Baloo 2',sans-serif;font-weight:900;font-size:.78rem;
+  color:#ffa733;background:rgba(236,30,121,.08);
+  border:2px solid rgba(255,167,51,.35);border-radius:8px;
+  padding:4px 10px;display:flex;align-items:center;gap:4px;
+  white-space:nowrap;
+}
+#timer-box.record-warn{color:#ff6b9d;border-color:#ff6b9d;}
+.level-bar{display:flex;gap:8px;justify-content:center;margin:0 0 5px;flex-wrap:wrap}
+.lvl-btn{
+  font-family:'Baloo 2',sans-serif;font-size:.82rem;font-weight:900;
+  padding:.34rem .85rem;border-radius:20px;border:2px solid transparent;
+  cursor:pointer;transition:all .18s;background:rgba(236,30,121,.06);
+}
+.lvl-btn.easy{border-color:#4ecb71;color:#4ecb71}
+.lvl-btn.easy.active{background:#4ecb71;color:#0f0525;box-shadow:0 0 12px rgba(78,203,113,.45)}
+.lvl-btn.medium{border-color:#ff9f43;color:#ff9f43}
+.lvl-btn.medium.active{background:#ff9f43;color:#0f0525;box-shadow:0 0 12px rgba(255,159,67,.45)}
+.lvl-btn.hard{border-color:#ec1e79;color:#ec1e79}
+.lvl-btn.hard.active{background:#ec1e79;color:#fff8e0;box-shadow:0 0 12px rgba(236,30,121,.5)}
+.lvl-desc{font-size:11px;color:#ffb890;text-align:center;margin-bottom:10px;font-style:italic;min-height:14px}
 
 /* ══ MAIN LAYOUT: grid LEFT, sidebar RIGHT on desktop ══ */
 .game-layout{
@@ -335,6 +357,8 @@ body{font-family:'Nunito','Baloo 2',sans-serif;background:#241143;min-height:100
   .bubble{max-width:240px;}
   .clue-item{font-size:clamp(.58rem,2.4vw,.7rem);}
   .btn-sm{padding:3px 8px!important;font-size:.68rem!important;}
+  .timer-box{font-size:.68rem;padding:3px 7px;}
+  .level-bar-game .lvl-btn{padding:.25rem .5rem;font-size:.7rem;}
   #gameScreen{padding-bottom:max(3.5rem,calc(3.5rem + env(safe-area-inset-bottom)));}
 }
 @media(max-width:380px){
@@ -343,6 +367,7 @@ body{font-family:'Nunito','Baloo 2',sans-serif;background:#241143;min-height:100
 }
 @media(max-width:320px){
   .bubble{display:none;}
+  .level-bar .lvl-btn,.level-bar-game .lvl-btn{padding:.22rem .4rem;font-size:.66rem;}
 }
 /* Landscape phone */
 @media(max-height:500px) and (orientation:landscape){
@@ -497,6 +522,12 @@ html.desktop-stage #scale-wrap #confetti{
       <label for="playerName">O teu nome:</label>
       <input type="text" id="playerName" maxlength="22" placeholder="Escreve o teu nome…" autocomplete="off" lang="pt-PT" spellcheck="true" inputmode="text">
     </div>
+    <div class="level-bar">
+      <button class="lvl-btn easy active" data-level="easy">⭐ Fácil</button>
+      <button class="lvl-btn medium" data-level="medium">⭐⭐ Médio</button>
+      <button class="lvl-btn hard" data-level="hard">⭐⭐⭐ Difícil</button>
+    </div>
+    <p class="lvl-desc" id="startLvlDesc">Grelha 7×7 · 6 palavras</p>
     <div class="row">
       <button id="btnStart" class="btn primary">▶ Começar a jogar!</button>
     </div>
@@ -507,15 +538,22 @@ html.desktop-stage #scale-wrap #confetti{
 <!-- JOGO -->
 <div id="gameScreen" class="screen">
   <div class="game-top">
+    <div class="level-bar level-bar-game">
+      <button class="lvl-btn easy" data-level="easy">⭐ Fácil</button>
+      <button class="lvl-btn medium" data-level="medium">⭐⭐ Médio</button>
+      <button class="lvl-btn hard" data-level="hard">⭐⭐⭐ Difícil</button>
+    </div>
     <div id="score-inline" style="font-family:&#39;Baloo 2&#39;,sans-serif;font-size:.82rem;font-weight:900;color:#ffb890;"></div>
     <div class="header-actions">
-      <button class="btn btn-sm" id="btn-hint">💡 Dica (<span id="hints-left">5</span>)</button>
+      <div class="timer-box" id="timer-box" title="Tempo de jogo">⏱️ <span id="timer-display">00:00</span></div>
+      <button class="btn btn-sm" id="btn-hint">💡 Dica (<span id="hints-left">3</span>)</button>
       <button class="btn btn-sm" id="btn-check">✅ Verificar</button>
       <button class="btn btn-sm primary" id="btn-restart">↺ Novo Jogo</button>
       <button class="btn btn-sm" id="btn-menu">🏠 Menu</button>
       <button id="btn-fullscreen" title="Ecrã inteiro">⛶</button>
     </div>
   </div>
+  <p class="tiny" id="recordDisplay" style="width:100%;max-width:1100px;margin:0 auto .2rem;"></p>
   <div id="msg" role="status" aria-live="polite"></div>
   <div id="tipToast" class="tip-toast" role="status" aria-live="polite"></div>
   <div class="game-layout">
@@ -699,7 +737,17 @@ const TIPS = {
   'PRIVACIDADE':'🙈 A privacidade é decidir quem pode ver as tuas informações — protege sempre a tua!',
   'ANTIVÍRUS':'💉 Um antivírus protege o computador de programas maliciosos, como um médico digital.',
   'ATUALIZAR':'🔄 Atualizar os teus dispositivos corrige falhas de segurança — faz sempre as atualizações!',
-  'PARTILHA':'🔁 Antes de partilhares algo online, pensa: "quero mesmo que todos vejam isto?"'
+  'PARTILHA':'🔁 Antes de partilhares algo online, pensa: "quero mesmo que todos vejam isto?"',
+  'DADOS':'🗂️ Os teus dados pessoais (nome, morada, fotos) são só teus — protege-os sempre!',
+  'REDE':'🌐 Numa rede social, pensa sempre antes de aceitares pedidos de amizade de estranhos.',
+  'AJUDA':'🙋 Se algo te deixar desconfortável online, pede sempre ajuda a um adulto de confiança.',
+  'MORADA':'🏠 Nunca partilhes a tua morada com pessoas que só conheces online.',
+  'CLICAR':'🤔 Pensa sempre antes de clicar num link desconhecido — pode ser perigoso!',
+  'FOTOS':'📸 Pensa bem antes de publicares fotos tuas ou de amigos — podem ficar online para sempre.',
+  'NUVEM':'☁️ Guardar ficheiros na nuvem é útil, mas usa sempre uma palavra-passe forte para proteger a conta.',
+  'DISPOSITIVO':'📱 Protege sempre o teu dispositivo com um código, palavra-passe ou impressão digital.',
+  'TELEFONE':'📞 Nunca partilhes o teu número de telefone com estranhos na Internet.',
+  'PUBLICAR':'📝 Antes de publicares algo, pensa se ficarias bem se a tua família visse.'
 };
 let tipsAprendidas = [];
 let tipT = null;
@@ -719,30 +767,66 @@ function showTip(word) {
 }
 
 /* ══════════════════════════════════════
-   PUZZLE — verified no-conflict grid
-   Grid offset: subtract min col (1) → display col = col - 1
-   Rows 0-14, Cols 1-16 → display 15 rows × 16 cols
+   NÍVEIS — cada grelha foi verificada à mão para não ter conflitos
    ══════════════════════════════════════ */
-const WORDS = [
-  { n:1,  w:'SEGURANÇA',   r:0,  c:0,  d:'across', clue:'Nome do tema deste jogo: cuidarmo-nos no mundo digital 🛡️' },
-  { n:1,  w:'SITE',        r:0,  c:0,  d:'down',   clue:'Página da Internet que visitas no browser, ex: www.exemplo.pt 🌐' },
-  { n:2,  w:'ROBÔ',        r:0,  c:4,  d:'down',   clue:'O VanBerto\'s é um... que te ajuda a aprender! 🤖' },
-  { n:3,  w:'ATUALIZAR',   r:0,  c:8,  d:'down',   clue:'Fazer isto aos programas e apps mantém-te mais protegido 🔄' },
-  { n:4,  w:'INTERNET',    r:1,  c:11, d:'down',   clue:'Rede mundial onde navegamos e comunicamos 🌐' },
-  { n:5,  w:'BACKUP',      r:2,  c:4,  d:'across', clue:'Cópia de segurança dos teus ficheiros 💾' },
-  { n:6,  w:'PARTILHA',    r:4,  c:5,  d:'down',   clue:'Tem cuidado com a _____ de fotos e informações 🤝' },
-  { n:7,  w:'ANTIVÍRUS',   r:5,  c:5,  d:'across', clue:'Programa que protege o computador contra ameaças 🦠💻' },
-  { n:8,  w:'HACKER',      r:7,  c:7,  d:'across', clue:'Pessoa que tenta entrar em contas sem autorização 🕵️' },
-  { n:9,  w:'PRIVACIDADE', r:11, c:1,  d:'across', clue:'Direito de guardar só para ti as tuas informações pessoais 🤫' },
-];
+const LEVELS = {
+  easy: {
+    rows: 6, cols: 7, hints: 3,
+    label: 'Grelha 6×7 · 5 palavras',
+    medalTimes: [45, 120],
+    words: [
+      { n:1, w:'AJUDA', r:0, c:0, d:'across', clue:'Se algo te incomodar online, pede sempre... a um adulto 🙋' },
+      { n:2, w:'DADOS', r:0, c:3, d:'down',   clue:'O teu nome, morada e fotos são exemplos dos teus... pessoais 🗂️' },
+      { n:3, w:'REDE',  r:2, c:1, d:'across', clue:'Numa ___ social, pensa antes de aceitares pedidos de amizade 🌐' },
+      { n:3, w:'ROBÔ',  r:2, c:1, d:'down',   clue:'O VanBerto\'s é um... que te ajuda a aprender! 🤖' },
+      { n:4, w:'SITE',  r:4, c:3, d:'across', clue:'Página da Internet que visitas no browser, ex: www.exemplo.pt 🌐' },
+    ]
+  },
+  medium: {
+    rows: 8, cols: 12, hints: 4,
+    label: 'Grelha 8×12 · 7 palavras',
+    medalTimes: [75, 180],
+    words: [
+      { n:1, w:'DISPOSITIVO', r:0, c:0, d:'across', clue:'Telemóvel, tablet ou computador — protege sempre o teu... 📱' },
+      { n:2, w:'PUBLICAR',    r:0, c:3, d:'down',   clue:'Antes de ___ uma foto, pensa se todos a deviam ver 📝' },
+      { n:3, w:'TELEFONE',    r:0, c:7, d:'down',   clue:'Nunca partilhes o teu número de ___ com estranhos 📞' },
+      { n:4, w:'NUVEM',       r:2, c:0, d:'down',   clue:'Guardar ficheiros na ___ é útil, mas protege sempre a conta ☁️' },
+      { n:5, w:'CLICAR',      r:2, c:5, d:'down',   clue:'Pensa sempre antes de... num link desconhecido 🤔' },
+      { n:6, w:'FOTOS',       r:4, c:7, d:'across', clue:'Pensa bem antes de publicares ___ tuas ou de amigos 📸' },
+      { n:7, w:'MORADA',      r:6, c:0, d:'across', clue:'Nunca partilhes a tua ___ com pessoas que só conheces online 🏠' },
+    ]
+  },
+  hard: {
+    rows: 12, cols: 14, hints: 5,
+    label: 'Grelha 12×14 · 10 palavras',
+    medalTimes: [90, 240],
+    words: [
+      { n:1,  w:'SEGURANÇA',   r:0,  c:0,  d:'across', clue:'Nome do tema deste jogo: cuidarmo-nos no mundo digital 🛡️' },
+      { n:1,  w:'SITE',        r:0,  c:0,  d:'down',   clue:'Página da Internet que visitas no browser, ex: www.exemplo.pt 🌐' },
+      { n:2,  w:'ROBÔ',        r:0,  c:4,  d:'down',   clue:'O VanBerto\'s é um... que te ajuda a aprender! 🤖' },
+      { n:3,  w:'ATUALIZAR',   r:0,  c:8,  d:'down',   clue:'Fazer isto aos programas e apps mantém-te mais protegido 🔄' },
+      { n:4,  w:'INTERNET',    r:1,  c:11, d:'down',   clue:'Rede mundial onde navegamos e comunicamos 🌐' },
+      { n:5,  w:'BACKUP',      r:2,  c:4,  d:'across', clue:'Cópia de segurança dos teus ficheiros 💾' },
+      { n:6,  w:'PARTILHA',    r:4,  c:5,  d:'down',   clue:'Tem cuidado com a _____ de fotos e informações 🤝' },
+      { n:7,  w:'ANTIVÍRUS',   r:5,  c:5,  d:'across', clue:'Programa que protege o computador contra ameaças 🦠💻' },
+      { n:8,  w:'HACKER',      r:7,  c:7,  d:'across', clue:'Pessoa que tenta entrar em contas sem autorização 🕵️' },
+      { n:9,  w:'PRIVACIDADE', r:11, c:1,  d:'across', clue:'Direito de guardar só para ti as tuas informações pessoais 🤫' },
+    ]
+  }
+};
 
-// deduplicate by (r,c,dir) for numbering
-const CLUE_WORDS = WORDS.filter((w,i,arr)=>
-  arr.findIndex(x=>x.r===w.r&&x.c===w.c&&x.d===w.d)===i
-);
-
-const MIN_COL = 0;
-const ROWS = 12, COLS = 14;
+let lvl = 'easy', startSel = 'easy';
+let WORDS = [], CLUE_WORDS = [], MIN_COL = 0, ROWS = 0, COLS = 0;
+function applyLevel(level) {
+  const L = LEVELS[level];
+  WORDS = L.words;
+  ROWS = L.rows; COLS = L.cols; MIN_COL = 0;
+  // deduplicate by (r,c,dir) for numbering
+  CLUE_WORDS = WORDS.filter((w,i,arr)=>
+    arr.findIndex(x=>x.r===w.r&&x.c===w.c&&x.d===w.d)===i
+  );
+}
+applyLevel(lvl);
 
 /* ══ BUILD LETTER MAP ══ */
 function buildLetterMap() {
@@ -764,22 +848,73 @@ let userMap = {};    // "r,c" -> letter typed
 let solved = new Set(); // word keys "n-d"
 let activeWord = null;
 let hintsLeft = 5;
-let startTime;
+/* dicas limitadas por sessão (não por partida): "Novo Jogo" não volta a dar dicas */
+const hintsSession = {};
+
+/* ══ CRONÓMETRO E RECORDE (por nível) ══ */
+let timerInterval = null, timerSeconds = 0;
+function fmtTime(sec){
+  const m=Math.floor(sec/60), s=sec%60;
+  return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+function startTimer(){
+  stopTimer();
+  timerSeconds = 0;
+  const disp = document.getElementById('timer-display');
+  if (disp) disp.textContent = fmtTime(0);
+  const tbox = document.getElementById('timer-box');
+  tbox && tbox.classList.remove('record-warn');
+  timerInterval = setInterval(()=>{
+    timerSeconds++;
+    if (disp) disp.textContent = fmtTime(timerSeconds);
+    updateLiveRecordHint();
+  }, 1000);
+}
+function stopTimer(){ if (timerInterval) { clearInterval(timerInterval); timerInterval = null; } }
+function recordKey(level){ return 'vb_cw_record_'+level; }
+function getRecord(level){
+  try { const v = localStorage.getItem(recordKey(level)); return v ? parseInt(v,10) : null; } catch(e){ return null; }
+}
+function setRecord(level, sec){ try { localStorage.setItem(recordKey(level), String(sec)); } catch(e){} }
+function updateRecordDisplay(){
+  const el = document.getElementById('recordDisplay');
+  if (!el) return;
+  const rec = getRecord(lvl);
+  el.textContent = rec != null ? ('🏆 O teu recorde neste nível: '+fmtTime(rec)) : '🏆 Ainda sem recorde neste nível — sê o primeiro!';
+}
+/* enquanto se joga, mostra quanto falta para bater o recorde */
+function updateLiveRecordHint(){
+  const el = document.getElementById('recordDisplay');
+  if (!el) return;
+  const rec = getRecord(lvl), tbox = document.getElementById('timer-box');
+  if (rec == null) return;
+  const remaining = rec - timerSeconds;
+  if (remaining > 0) {
+    el.textContent = '🏆 Faltam '+fmtTime(remaining)+' para bateres o teu recorde!';
+    tbox && tbox.classList.remove('record-warn');
+  } else {
+    el.textContent = '⏳ Já passaste o teu tempo recorde ('+fmtTime(rec)+') — força, ainda dá para terminar!';
+    tbox && tbox.classList.add('record-warn');
+  }
+}
 
 function wordKey(wobj) { return wobj.n+'-'+wobj.d; }
 
 /* ══ RENDER GRID ══ */
 function buildGrid() {
+  applyLevel(lvl);
   letterMap = buildLetterMap();
   userMap = {};
   solved.clear();
   activeWord = null;
-  hintsLeft = 5;
-  startTime = Date.now();
+  if (!(lvl in hintsSession)) hintsSession[lvl] = LEVELS[lvl].hints;
+  hintsLeft = hintsSession[lvl];
   tipsAprendidas = [];
   const tt = document.getElementById('tipToast'); if (tt) tt.classList.remove('show');
-  document.getElementById('hints-left').textContent = 5;
+  document.getElementById('hints-left').textContent = hintsLeft;
   document.getElementById('msg').textContent = '';
+  updateRecordDisplay();
+  startTimer();
   // Double rAF — wait for layout to settle before measuring
   requestAnimationFrame(()=>requestAnimationFrame(()=>_renderGrid()));
 }
@@ -984,12 +1119,28 @@ function activateMobileInput(r, c) {
 
   // Normal cell activation (skip if disabled and no toggle happened)
   if (inp.disabled) {
-    // cell is correct but only one word — just highlight that word
-    if (candidates.length === 1) {
-      highlight(candidates[0]);
+    if (candidates.length > 1) {
+      // Cell already solved via one crossing word, but another (unsolved) word
+      // also passes through here — let the tap switch to that other word instead
+      // of doing nothing, even if it doesn't "start" at this exact cell.
+      const currentIdx = candidates.findIndex(w => w === activeWord);
+      const next = candidates[(currentIdx + 1) % candidates.length];
+      for (let i=0;i<next.w.length;i++) {
+        const rr = next.d==='down'? next.r+i : next.r;
+        const cc = next.d==='across'? next.c+i : next.c;
+        const ninp = getInput(rr, cc);
+        if (ninp && !ninp.disabled) { activateMobileInput(rr, cc); return; }
+      }
+      // that word is also fully solved already — just highlight it
+      highlight(next);
       setActiveCell(r, c);
       mobileR = r; mobileC = c;
+      return;
     }
+    // cell is correct but only one word — just highlight that word
+    highlight(candidates[0]);
+    setActiveCell(r, c);
+    mobileR = r; mobileC = c;
     return;
   }
 
@@ -1203,6 +1354,7 @@ document.getElementById('btn-hint').addEventListener('click', () => {
     }
   }
   hintsLeft--;
+  hintsSession[lvl] = hintsLeft;
   document.getElementById('hints-left').textContent = hintsLeft;
   checkWords();
   showBub('Dica dada! Encontra o resto! 💡');
@@ -1227,13 +1379,21 @@ document.getElementById('btn-check').addEventListener('click', () => {
 
 /* ══ WIN ══ */
 function showWin() {
+  stopTimer();
   playWin();
-  const elapsed = Math.round((Date.now()-startTime)/1000);
+  const elapsed = timerSeconds;
   const m=Math.floor(elapsed/60), s=elapsed%60;
   document.getElementById('winName').textContent = playerName;
   document.getElementById('winFound').textContent = solved.size+' / '+CLUE_WORDS.length;
-  document.getElementById('winTime').textContent = m?m+'m '+s+'s':s+'s';
-  document.getElementById('winMedal').textContent = elapsed<90?'🥇 Super rápido!':elapsed<240?'🥈 Muito bem!':'🥉 Parabéns!';
+  let recordMsg = '';
+  const prevRecord = getRecord(lvl);
+  if (prevRecord == null || elapsed < prevRecord) {
+    setRecord(lvl, elapsed);
+    recordMsg = ' — 🎉 Novo recorde!';
+  }
+  document.getElementById('winTime').textContent = (m?m+'m '+s+'s':s+'s') + recordMsg;
+  const [t1,t2] = LEVELS[lvl].medalTimes;
+  document.getElementById('winMedal').textContent = elapsed<t1?'🥇 Super rápido!':elapsed<t2?'🥈 Muito bem!':'🥉 Parabéns!';
   const winTipsList=document.getElementById('winTipsList'), winTips=document.getElementById('winTips');
   if (winTips && winTipsList) {
     if (tipsAprendidas.length) {
@@ -1255,14 +1415,28 @@ function showWin() {
    #0a0414 escuro = tom da vinheta radial dos outros ecrãs (menu, vitória) */
 function setLetterbox(c){document.body.style.background=c;document.documentElement.style.background=c;}
 
+/* ══ LEVEL BUTTONS ══ */
+document.querySelectorAll('#startScreen .lvl-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#startScreen .lvl-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); startSel = b.dataset.level;
+  document.getElementById('startLvlDesc').textContent = LEVELS[startSel].label;
+}));
+document.querySelectorAll('#gameScreen .lvl-btn').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#gameScreen .lvl-btn').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); lvl = b.dataset.level;
+  buildGrid();
+}));
+
 /* ══ NAV ══ */
 document.getElementById('btnStart').addEventListener('click', () => {
   playerName = document.getElementById('playerName').value.trim() || 'Herói da Cibersegurança';
+  lvl = startSel;
   document.getElementById('startScreen').classList.remove('active');
   document.getElementById('gameScreen').classList.add('active');
   setLetterbox('#241143');
   document.getElementById('fixed-robot-name').textContent = '👤 '+playerName;
   document.getElementById('fixed-robot-wrap').classList.add('visible');
+  document.querySelectorAll('#gameScreen .lvl-btn').forEach(b=>b.classList.toggle('active', b.dataset.level===lvl));
   showBub('Vamos lá, ' + playerName + '! 🎈');
   buildGrid();
 });
@@ -1273,6 +1447,7 @@ document.getElementById('btn-menu').addEventListener('click', goMenu);
 document.getElementById('btnWinRestart').addEventListener('click', ()=>{ stopConf(); document.getElementById('winOverlay').classList.remove('active'); document.getElementById('gameScreen').classList.add('active'); setLetterbox('#241143'); buildGrid(); });
 document.getElementById('btnWinMenu').addEventListener('click', ()=>{ stopConf(); goMenu(); });
 function goMenu() {
+  stopTimer();
   document.getElementById('gameScreen').classList.remove('active');
   document.getElementById('winOverlay').classList.remove('active');
   document.getElementById('startScreen').classList.add('active');
@@ -1304,14 +1479,12 @@ function rebuildGridKeepState() {
   const savedUser = {...userMap};
   const savedSolved = new Set(solved);
   const savedHints = hintsLeft;
-  const savedStart = startTime;
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
     _renderGrid();
     // Restore state after render
     userMap = savedUser;
     solved = savedSolved;
     hintsLeft = savedHints;
-    startTime = savedStart;
     document.getElementById('hints-left').textContent = hintsLeft;
     for (const key in userMap) {
       const [r,c] = key.split(',').map(Number);
