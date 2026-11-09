@@ -741,6 +741,23 @@ body{font-family:'Nunito','Trebuchet MS',sans-serif;}
 .win-name-txt{color:var(--soft);font-style:normal;font-weight:700;}
 .win-stat{background:var(--cream);color:var(--ink);border:2px solid var(--ink);border-radius:12px;}
 .win-medal{background:var(--sun);color:var(--ink);border:2px solid var(--ink);border-radius:12px;box-shadow:0 3px 0 var(--ink);}
+
+/* só as ações, alinhadas à direita */
+.header-actions{margin-left:auto;}
+
+/* DICAS bem evidentes */
+#btn-hint{background:linear-gradient(180deg,#ffe066,#ffc800) !important;color:#1e1b4b !important;border:3px solid #1e1b4b !important;font-weight:700 !important;box-shadow:0 3px 0 #1e1b4b,0 0 0 3px rgba(255,200,0,.35) !important;display:inline-flex;align-items:center;gap:5px;animation:hintBtnPulse 2s ease-in-out infinite;}
+#btn-hint:hover{background:linear-gradient(180deg,#fff08a,#ffd633) !important;transform:translateY(-2px);box-shadow:0 5px 0 #1e1b4b,0 0 0 4px rgba(255,200,0,.45) !important;}
+#btn-hint:active{transform:translateY(2px);box-shadow:0 1px 0 #1e1b4b !important;}
+#btn-hint .hint-count{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 4px;border-radius:50%;background:#ec1e79;color:#fff;border:2px solid #1e1b4b;font-size:.7rem;line-height:1;}
+#btn-hint.empty{background:#e5e7eb !important;color:#6b7280 !important;box-shadow:0 3px 0 #9ca3af !important;animation:none;cursor:not-allowed;}
+#btn-hint.empty .hint-count{background:#9ca3af;}
+@keyframes hintBtnPulse{0%,100%{box-shadow:0 3px 0 #1e1b4b,0 0 0 3px rgba(255,200,0,.30);}50%{box-shadow:0 3px 0 #1e1b4b,0 0 0 7px rgba(255,200,0,.12);}}
+.cw-cell.hint-flash{animation:hintCell .6s ease-in-out infinite alternate;z-index:4;box-shadow:0 0 0 4px #ffc800,0 0 18px 6px rgba(255,200,0,.85) !important;background:#fff3b0 !important;}
+@keyframes hintCell{from{transform:scale(1);}to{transform:scale(1.14);}}
+.hint-banner{position:fixed;left:50%;top:14px;transform:translate(-50%,-140%);z-index:900;max-width:92vw;background:#ffc800;color:#1e1b4b;border:3px solid #1e1b4b;border-radius:16px;padding:10px 20px;box-shadow:0 5px 0 #1e1b4b;font:700 clamp(16px,2.6vw,24px) 'Fredoka','Nunito',sans-serif;text-align:center;pointer-events:none;opacity:0;transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .2s;}
+.hint-banner.show{transform:translate(-50%,0);opacity:1;}
+@media(prefers-reduced-motion:reduce){#btn-hint,.cw-cell.hint-flash{animation:none !important;}.hint-banner{transition:none;}}
 </style>
 </head>
 <body lang="pt-PT">
@@ -773,14 +790,9 @@ body{font-family:'Nunito','Trebuchet MS',sans-serif;}
 <!-- JOGO -->
 <div id="gameScreen" class="screen">
   <div class="game-top">
-    <div class="level-bar level-bar-game">
-      <button class="lvl-btn easy" data-level="easy">⭐ Fácil</button>
-      <button class="lvl-btn medium" data-level="medium">⭐⭐ Médio</button>
-      <button class="lvl-btn hard" data-level="hard">⭐⭐⭐ Difícil</button>
-    </div>
     <div id="score-inline" style="font-family:&#39;Baloo 2&#39;,sans-serif;font-size:.82rem;font-weight:900;color:#ffb890;"></div>
     <div class="header-actions">
-      <button class="btn btn-sm" id="btn-hint">💡 Dica (<span id="hints-left">3</span>)</button>
+      <button class="btn btn-sm" id="btn-hint" aria-label="Usar uma dica">💡 Dica <span class="hint-count" id="hints-left">3</span></button>
       <button class="btn btn-sm" id="btn-check">✅ Verificar</button>
       <button class="btn btn-sm primary" id="btn-restart">↺ Novo Jogo</button>
       <button class="btn btn-sm" id="btn-menu">🏠 Menu</button>
@@ -788,6 +800,7 @@ body{font-family:'Nunito','Trebuchet MS',sans-serif;}
     </div>
   </div>
   <div id="msg" role="status" aria-live="polite"></div>
+  <div id="hintBanner" class="hint-banner" role="status" aria-live="polite"></div>
   <div id="tipToast" class="tip-toast" role="status" aria-live="polite"></div>
   <div class="game-layout">
     <div id="cw-wrap"><div id="cw-grid"></div></div>
@@ -1082,8 +1095,13 @@ let userMap = {};    // "r,c" -> letter typed
 let solved = new Set(); // word keys "n-d"
 let activeWord = null;
 let hintsLeft = 5;
-/* dicas limitadas por sessão (não por partida): "Novo Jogo" não volta a dar dicas */
-const hintsSession = {};
+/* cada novo jogo começa sempre com as dicas do nível */
+function updateHintUI(){
+  const b=document.getElementById('btn-hint'),n=document.getElementById('hints-left');
+  if(n)n.textContent=hintsLeft;
+  if(b){b.classList.toggle('empty',!hintsLeft);b.setAttribute('aria-disabled',hintsLeft?'false':'true');}
+}
+function showHintBanner(t,ms){const hb=document.getElementById('hintBanner');hb.textContent=t;hb.classList.add('show');clearTimeout(hb._t);hb._t=setTimeout(()=>hb.classList.remove('show'),ms||3500);}
 
 /* ══ CRONÓMETRO E RECORDE (por nível) ══ */
 /* (cronómetro e recordes removidos — o jogo já não conta o tempo) */
@@ -1101,12 +1119,11 @@ function buildGrid() {
   userMap = {};
   solved.clear();
   activeWord = null;
-  if (!(lvl in hintsSession)) hintsSession[lvl] = LEVELS[lvl].hints;
-  hintsLeft = hintsSession[lvl];
+  hintsLeft = LEVELS[lvl].hints;
   hintsUsedGame = 0;
   tipsAprendidas = [];
   const tt = document.getElementById('tipToast'); if (tt) tt.classList.remove('show');
-  document.getElementById('hints-left').textContent = hintsLeft;
+  updateHintUI();
   document.getElementById('msg').textContent = '';
   updateRecordDisplay();
   startTimer();
@@ -1566,7 +1583,7 @@ function renderClues() {
 
 /* ══ HINT ══ */
 document.getElementById('btn-hint').addEventListener('click', () => {
-  if (!hintsLeft) { showBub('Sem mais dicas! 😅'); return; }
+  if (!hintsLeft) { showBub('Sem mais dicas! 😅'); showHintBanner('💡 Já não tens mais dicas neste jogo',2200); return; }
   const unsolved = CLUE_WORDS.filter(w=>!solved.has(wordKey(w)));
   if (!unsolved.length) return;
   const w = (activeWord && unsolved.includes(activeWord)) ? activeWord : unsolved[Math.floor(Math.random()*unsolved.length)];
@@ -1579,16 +1596,16 @@ document.getElementById('btn-hint').addEventListener('click', () => {
       const inp = getInput(r,c);
       if (inp) inp.value = w.w[i];
       const cell = getCell(r,c);
-      if (cell) cell.classList.remove('wrong-flash');
+      if (cell) { cell.classList.remove('wrong-flash'); cell.classList.add('hint-flash'); setTimeout(()=>cell.classList.remove('hint-flash'),3500); }
       break;
     }
   }
   hintsLeft--;
   hintsUsedGame++;
-  hintsSession[lvl] = hintsLeft;
-  document.getElementById('hints-left').textContent = hintsLeft;
+  updateHintUI();
   checkWords();
   showBub('Dica dada! Encontra o resto! 💡');
+  showHintBanner('💡 Dica: revelei uma letra!');
 });
 
 /* ══ CHECK BUTTON ══ */
@@ -1642,11 +1659,6 @@ document.querySelectorAll('#startScreen .lvl-btn').forEach(b=>b.addEventListener
   b.classList.add('active'); startSel = b.dataset.level;
   document.getElementById('startLvlDesc').textContent = LEVELS[startSel].label;
 }));
-document.querySelectorAll('#gameScreen .lvl-btn').forEach(b=>b.addEventListener('click',()=>{
-  document.querySelectorAll('#gameScreen .lvl-btn').forEach(x=>x.classList.remove('active'));
-  b.classList.add('active'); lvl = b.dataset.level;
-  buildGrid();
-}));
 
 /* ══ NAV ══ */
 document.getElementById('btnStart').addEventListener('click', () => {
@@ -1657,7 +1669,6 @@ document.getElementById('btnStart').addEventListener('click', () => {
   setLetterbox('#241143');
   document.getElementById('fixed-robot-name').textContent = '👤 '+playerName;
   document.getElementById('fixed-robot-wrap').classList.add('visible');
-  document.querySelectorAll('#gameScreen .lvl-btn').forEach(b=>b.classList.toggle('active', b.dataset.level===lvl));
   showBub('Vamos lá, ' + playerName + '! 🎈');
   buildGrid();
 });
@@ -1706,7 +1717,7 @@ function rebuildGridKeepState() {
     userMap = savedUser;
     solved = savedSolved;
     hintsLeft = savedHints;
-    document.getElementById('hints-left').textContent = hintsLeft;
+    updateHintUI();
     for (const key in userMap) {
       const [r,c] = key.split(',').map(Number);
       const inp = getInput(r,c);
